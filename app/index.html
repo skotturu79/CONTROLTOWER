@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Warehouse Control Tower</title>
+<style>
+  :root{
+    --bg:#f4f4f2;
+    --surface:#ffffff;
+    --ink:#1a2533;
+    --ink-2:#5b6b7d;
+    --ink-3:#94a1b0;
+    --hair:#eceae6;
+    --hair-2:#e3e1dc;
+    --blue:#0a6ed1;
+    --blue-soft:#eef5fc;
+    --neg:#bb2222;
+    --neg-soft:#fbeeee;
+    --crit:#c7700a;
+    --crit-soft:#fdf3e6;
+    --pos:#1a7a3e;
+    --pos-soft:#eef7f0;
+    --neu:#6a7785;
+    --font:"72","72full",-apple-system,"Segoe UI",Arial,sans-serif;
+    --shadow-sm:0 1px 2px rgba(26,37,51,.05),0 1px 1px rgba(26,37,51,.04);
+    --shadow:0 4px 16px rgba(26,37,51,.07),0 1px 3px rgba(26,37,51,.05);
+    --shadow-lg:0 12px 40px rgba(26,37,51,.10),0 2px 8px rgba(26,37,51,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+  }
+  svg{display:block}
+  ::selection{background:#cfe6fa}
+
+  /* ---------- shell ---------- */
+  .shell{
+    height:52px;background:var(--surface);border-bottom:1px solid var(--hair-2);
+    display:flex;align-items:center;gap:14px;padding:0 24px;position:sticky;top:0;z-index:60;
+  }
+  .logo{font:800 15px/1 Arial,sans-serif;letter-spacing:.04em;color:#0a3d91}
+  .shell-title{font-size:14px;font-weight:700;padding-left:14px;border-left:1px solid var(--hair-2)}
+  .shell-title span{color:var(--ink-3);font-weight:500}
+  .shell-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+  .env{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);font-weight:600}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--pos);position:relative}
+  .pulse::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid var(--pos);
+    animation:ring 2.4s ease-out infinite}
+  @keyframes ring{0%{opacity:.6;transform:scale(.6)}100%{opacity:0;transform:scale(1.5)}}
+  .avatar{width:32px;height:32px;border-radius:50%;background:#5d7793;color:#fff;
+    display:grid;place-items:center;font-size:12px;font-weight:700}
+
+  .switch{display:flex;border:1px solid var(--hair-2);border-radius:9px;overflow:hidden;background:var(--surface)}
+  .switch button{
+    font-family:var(--font);font-size:12.5px;font-weight:600;background:none;color:var(--ink-2);
+    border:none;cursor:pointer;padding:7px 14px;display:flex;align-items:center;gap:7px;transition:.13s;
+  }
+  .switch button+button{border-left:1px solid var(--hair-2)}
+  .switch button.sel{background:var(--blue);color:#fff}
+  .switch button:not(.sel):hover{background:#f0f0ee}
+
+  /* ---------- canvas ---------- */
+  .canvas{max-width:1280px;margin:0 auto;padding:34px 30px 70px}
+  .view{display:none}
+  .view.on{display:block;animation:fade .3s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1}}
+
+  /* ---------- situation header ---------- */
+  .situation{margin-bottom:26px;display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .situation .greeting{font-size:13px;color:var(--ink-3);font-weight:600;letter-spacing:.02em}
+  .situation h1{font-size:25px;font-weight:700;letter-spacing:-.02em;margin-top:3px}
+  .situation h1 b{color:var(--crit)}
+  .flowstrip{display:flex;gap:3px;align-items:center}
+  .flowstrip .fs-label{font-size:11px;color:var(--ink-3);font-weight:600;margin-right:8px}
+  .seg{width:30px;height:7px;border-radius:4px;background:var(--pos);position:relative}
+  .seg.warn{background:var(--crit)} .seg.bad{background:var(--neg)}
+  .seg .seg-tip{
+    position:absolute;bottom:15px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;font-size:11px;font-weight:600;white-space:nowrap;
+    padding:4px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:.15s;
+  }
+  .seg:hover .seg-tip{opacity:1}
+
+  /* ---------- layout ---------- */
+  .layout{display:grid;grid-template-columns:286px 1fr;gap:22px;align-items:start}
+
+  /* ---------- priority rail ---------- */
+  .rail-head{
+    font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em;
+    margin-bottom:12px;padding-left:2px;display:flex;align-items:center;gap:8px;
+  }
+  .rail-head .rh-n{
+    margin-left:auto;font-size:11px;font-weight:700;color:var(--ink-3);
+    background:var(--surface);border:1px solid var(--hair-2);border-radius:20px;padding:1px 9px;
+    letter-spacing:0;text-transform:none;
+  }
+  .qitem{
+    background:var(--surface);border:1px solid var(--hair-2);border-radius:14px;
+    padding:13px 14px;margin-bottom:9px;cursor:pointer;transition:.16s ease;
+    position:relative;opacity:0;animation:fadeup .5s ease forwards;
+  }
+  @keyframes fadeup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .qitem:hover{border-color:#cdd4dc;transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+  .qitem.active{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue),var(--shadow)}
+  .qitem.active::before{
+    content:"";position:absolute;left:-1px;top:14px;bottom:14px;width:3px;
+    background:var(--blue);border-radius:3px;
+  }
+  .qi-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+  .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .dot.crit{background:var(--neg)} .dot.warn{background:var(--crit)} .dot.watch{background:var(--neu)}
+  .dot.done{background:var(--pos)}
+  .qi-sev{font-size:11px;font-weight:700;letter-spacing:.02em}
+  .qi-sev.crit{color:var(--neg)} .qi-sev.warn{color:var(--crit)}
+  .qi-sev.watch{color:var(--neu)} .qi-sev.done{color:var(--pos)}
+  .qi-cd{margin-left:auto;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+  .qi-title{font-size:13.5px;font-weight:600;line-height:1.4;color:var(--ink)}
+  .qi-meta{font-size:11.5px;color:var(--ink-3);margin-top:4px}
+
+  /* ---------- focus card ---------- */
+  .focus{
+    background:var(--surface);border-radius:20px;box-shadow:var(--shadow-lg);
+    overflow:hidden;animation:swap .35s ease;
+  }
+  @keyframes swap{from{opacity:0;transform:scale(.99)}to{opacity:1;transform:none}}
+  .hero{padding:30px 34px 26px;position:relative;border-bottom:1px solid var(--hair)}
+  .hero::after{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+  .focus.crit .hero::after{background:var(--neg)}
+  .focus.warn .hero::after{background:var(--crit)}
+  .focus.watch .hero::after{background:var(--neu)}
+  .focus.done .hero::after{background:var(--pos)}
+  .hero-top{display:flex;justify-content:space-between;align-items:flex-start;gap:30px}
+  .pill{
+    display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;
+    padding:5px 11px;border-radius:20px;letter-spacing:.03em;
+  }
+  .pill.crit{background:var(--neg-soft);color:var(--neg)}
+  .pill.warn{background:var(--crit-soft);color:var(--crit)}
+  .pill.watch{background:#eef0f2;color:var(--neu)}
+  .pill.done{background:var(--pos-soft);color:var(--pos)}
+  .pill .pdot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .hero h2{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.28;margin:14px 0 7px;max-width:30ch}
+  .hero .exposure{font-size:13.5px;color:var(--ink-2)}
+  .countdown{text-align:right;flex-shrink:0}
+  .countdown .cd-val{font-size:34px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .focus.crit .cd-val{color:var(--neg)}
+  .focus.warn .cd-val{color:var(--crit)}
+  .focus.watch .cd-val{color:var(--neu)}
+  .focus.done .cd-val{color:var(--pos)}
+  .countdown .cd-label{font-size:11.5px;color:var(--ink-3);font-weight:600;margin-top:6px}
+  .countdown .cd-conf{display:inline-flex;align-items:center;gap:7px;margin-top:11px;
+    font-size:11px;color:var(--ink-3);font-weight:600}
+  .cd-conf .cbar{width:54px;height:5px;background:var(--hair-2);border-radius:3px;overflow:hidden}
+  .cd-conf .cbar i{display:block;height:100%;background:var(--blue);border-radius:3px}
+
+  .section{padding:24px 34px}
+  .section + .section{border-top:1px solid var(--hair)}
+  .sec-label{
+    font-size:11.5px;font-weight:700;color:var(--ink-3);text-transform:uppercase;
+    letter-spacing:.08em;margin-bottom:18px;
+  }
+
+  /* diagnosis path */
+  .path{display:flex;align-items:flex-start;gap:0;overflow-x:auto;padding-bottom:4px}
+  .path::-webkit-scrollbar{height:0}
+  .pnode{flex:1;min-width:118px;text-align:center;position:relative;padding:0 4px}
+  .pnode .pn-dot{
+    width:17px;height:17px;border-radius:50%;margin:0 auto 11px;position:relative;z-index:2;
+    background:#fff;border:3px solid var(--ink-3);
+  }
+  .pnode.cause .pn-dot{border-color:var(--neg);background:var(--neg)}
+  .pnode.end .pn-dot{border-color:var(--neg);background:var(--neg)}
+  .pnode.cause .pn-dot::after,.pnode.end .pn-dot::after{
+    content:"";position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--neg);opacity:.3;
+  }
+  .pnode .pn-line{position:absolute;top:8px;left:50%;width:100%;height:2px;background:var(--hair-2);z-index:1}
+  .pnode:last-child .pn-line{display:none}
+  .pnode .pn-label{font-size:12px;font-weight:600;line-height:1.35;color:var(--ink)}
+  .pnode .pn-state{font-size:10.5px;font-weight:600;margin-top:4px}
+  .pnode.cause .pn-state,.pnode.end .pn-state{color:var(--neg)}
+  .pnode.mid .pn-state{color:var(--crit)}
+  .path-foot{
+    margin-top:16px;font-size:11.5px;color:var(--ink-3);display:flex;align-items:center;gap:7px;
+  }
+  .path-foot svg{flex-shrink:0}
+
+  /* recommended recovery */
+  .reco{
+    background:linear-gradient(180deg,var(--blue-soft),#f7fbfe);
+    border:1px solid #d4e6f7;border-radius:16px;padding:20px 22px;
+  }
+  .reco-tag{
+    display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+    color:var(--blue);letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;
+  }
+  .reco h3{font-size:17px;font-weight:700;letter-spacing:-.01em}
+  .reco .reco-desc{font-size:13px;color:var(--ink-2);line-height:1.6;margin-top:7px}
+  .reco-stats{display:flex;gap:10px;margin-top:18px}
+  .rstat{flex:1;background:#fff;border:1px solid #dde9f4;border-radius:11px;padding:11px 13px}
+  .rstat .rs-k{font-size:10px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+  .rstat .rs-v{font-size:14.5px;font-weight:700;margin-top:5px}
+  .rstat .rs-v.good{color:var(--pos)}
+  .alt-toggle{
+    margin-top:16px;display:inline-flex;align-items:center;gap:7px;
+    font-size:12.5px;font-weight:600;color:var(--blue);cursor:pointer;
+    background:none;border:none;font-family:var(--font);padding:0;
+  }
+  .alt-toggle svg{transition:transform .2s}
+  .alt-toggle.open svg{transform:rotate(180deg)}
+  .alts{display:none;margin-top:14px}
+  .alts.show{display:block;animation:fadeup .25s ease}
+  .alt{
+    border:1px solid var(--hair-2);border-radius:12px;padding:13px 15px;margin-bottom:8px;
+    cursor:pointer;transition:.14s;background:#fff;
+  }
+  .alt:hover{border-color:#cdd4dc}
+  .alt.picked{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue)}
+  .alt-top{display:flex;align-items:center;gap:10px}
+  .radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink-3);flex-shrink:0;display:grid;place-items:center}
+  .alt.picked .radio{border-color:var(--blue)}
+  .alt.picked .radio::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--blue)}
+  .alt-top .alt-name{font-size:13.5px;font-weight:600;flex:1}
+  .alt-mini{display:flex;gap:14px;margin-top:8px;padding-left:26px}
+  .alt-mini span{font-size:11.5px;color:var(--ink-2)}
+  .alt-mini span b{color:var(--ink);font-weight:600}
+
+  /* action footer */
+  .actionbar{
+    padding:20px 34px;background:#fbfbfa;border-top:1px solid var(--hair);
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  }
+  .autonomy{display:flex;align-items:center;gap:9px;flex:1;min-width:240px}
+  .autonomy .a-ic{
+    width:24px;height:24px;border-radius:7px;flex-shrink:0;display:grid;place-items:center;
+    font-size:13px;font-weight:800;color:#fff;
+  }
+  .autonomy.gate .a-ic{background:var(--crit)}
+  .autonomy.auto .a-ic{background:var(--pos)}
+  .autonomy .a-txt{font-size:12px;color:var(--ink-2);line-height:1.45}
+  .autonomy .a-txt b{color:var(--ink);font-weight:600}
+  .btn{
+    font-family:var(--font);font-size:13.5px;font-weight:600;border-radius:10px;
+    cursor:pointer;transition:.14s;border:1px solid transparent;white-space:nowrap;
+  }
+  .btn-primary{background:var(--blue);color:#fff;padding:12px 24px;box-shadow:0 2px 8px rgba(10,110,209,.28)}
+  .btn-primary:hover{background:#0961bb;box-shadow:0 4px 14px rgba(10,110,209,.34)}
+  .btn-ghost{background:none;color:var(--ink-2);padding:12px 16px;border-color:var(--hair-2)}
+  .btn-ghost:hover{background:#f0f0ee}
+
+  .done-state{display:none;padding:30px 34px;text-align:center}
+  .done-state.show{display:block;animation:fadeup .35s ease}
+  .done-state .check{
+    width:50px;height:50px;border-radius:50%;background:var(--pos-soft);
+    display:grid;place-items:center;margin:0 auto 14px;
+  }
+  .done-state h3{font-size:16px;font-weight:700}
+  .done-state p{font-size:13px;color:var(--ink-2);margin-top:8px;max-width:46ch;margin:8px auto 0;line-height:1.6}
+  .done-state .verify{
+    display:inline-flex;align-items:center;gap:8px;margin-top:16px;
+    font-size:12px;font-weight:600;color:var(--pos);
+    background:var(--pos-soft);padding:7px 14px;border-radius:20px;
+  }
+
+  .footnote{
+    margin-top:22px;font-size:12px;color:var(--ink-3);line-height:1.7;text-align:center;padding:0 40px;
+  }
+  .footnote b{color:var(--ink-2);font-weight:600}
+
+  /* ---- loading skeleton ---- */
+  .skeleton{background:linear-gradient(90deg,var(--hair) 25%,#f0ede9 50%,var(--hair) 75%);
+    background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:8px;}
+  @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* ================= FIELD APP ================= */
+  .field-wrap{display:flex;gap:54px;justify-content:center;align-items:flex-start;flex-wrap:wrap;padding:6px 0}
+  .phone{
+    width:380px;background:#1c2733;border-radius:42px;padding:12px;flex-shrink:0;
+    box-shadow:0 30px 64px rgba(26,37,51,.34);
+  }
+  .pscreen{background:var(--bg);border-radius:32px;overflow:hidden;height:778px;display:flex;flex-direction:column;position:relative}
+  .pstatus{display:flex;justify-content:space-between;padding:11px 22px 5px;font-size:12px;font-weight:700;color:var(--ink-2)}
+  .phead{background:var(--surface);padding:10px 18px 13px;border-bottom:1px solid var(--hair-2);display:flex;align-items:center;gap:11px}
+  .phead .logo{font-size:13px}
+  .phead .ph-t{flex:1;border-left:1px solid var(--hair-2);padding-left:11px}
+  .phead .ph-t h2{font-size:13.5px;font-weight:700}
+  .phead .ph-t p{font-size:10.5px;color:var(--ink-2);margin-top:1px}
+  .pscroll{flex:1;overflow-y:auto}
+  .pscroll::-webkit-scrollbar{width:0}
+
+  .dc-banner{
+    margin:15px 15px 6px;background:var(--surface);border-radius:16px;box-shadow:var(--shadow);
+    padding:17px;display:flex;align-items:center;gap:15px;border-left:5px solid var(--crit);
+  }
+  .dc-banner .dc-ring{
+    width:54px;height:54px;border-radius:50%;border:4px solid var(--crit);flex-shrink:0;
+    display:grid;place-items:center;font-size:21px;font-weight:800;color:var(--crit);
+  }
+  .dc-banner .dc-t b{font-size:15px;font-weight:700;color:var(--crit)}
+  .dc-banner .dc-t p{font-size:12px;color:var(--ink-2);margin-top:4px;line-height:1.45}
+
+  .p-section{
+    font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.07em;
+    padding:14px 19px 9px;display:flex;align-items:center;gap:8px;
+  }
+  .p-section .ps-badge{
+    margin-left:auto;background:var(--neg);color:#fff;font-size:9.5px;font-weight:700;
+    padding:2px 9px;border-radius:20px;letter-spacing:.03em;
+  }
+
+  .ffocus{
+    margin:0 15px 11px;background:var(--surface);border-radius:18px;box-shadow:var(--shadow);
+    overflow:hidden;
+  }
+  .ff-hero{padding:16px 17px;position:relative;border-bottom:1px solid var(--hair)}
+  .ff-hero::after{content:"";position:absolute;left:0;top:0;bottom:0;width:5px}
+  .ffocus.crit .ff-hero::after{background:var(--neg)}
+  .ffocus.warn .ff-hero::after{background:var(--crit)}
+  .ff-hero-top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .ff-cd{margin-left:auto;text-align:right}
+  .ff-cd .v{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .ffocus.crit .ff-cd .v{color:var(--neg)}
+  .ffocus.warn .ff-cd .v{color:var(--crit)}
+  .ff-cd .l{font-size:9px;color:var(--ink-3);font-weight:600;margin-top:3px}
+  .ff-hero h3{font-size:15.5px;font-weight:700;line-height:1.32}
+  .ff-hero .ff-exp{font-size:12px;color:var(--ink-2);margin-top:6px;line-height:1.45}
+
+  .ff-reco{padding:15px 17px}
+  .ff-reco .frl{
+    font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em;
+    display:flex;align-items:center;gap:5px;margin-bottom:8px;
+  }
+  .ff-reco h4{font-size:14px;font-weight:700;line-height:1.35}
+  .ff-reco .frd{font-size:12px;color:var(--ink-2);line-height:1.55;margin-top:6px}
+  .ff-chips{display:flex;gap:7px;margin-top:13px;flex-wrap:wrap}
+  .fchip{
+    font-size:11px;font-weight:600;background:var(--bg);border:1px solid var(--hair-2);
+    border-radius:8px;padding:5px 10px;color:var(--ink-2);
+  }
+  .fchip b{color:var(--pos);font-weight:700}
+
+  .ff-actions{padding:13px 17px 16px;display:flex;flex-direction:column;gap:8px}
+  .fbtn{
+    font-family:var(--font);font-size:13.5px;font-weight:600;border-radius:11px;
+    padding:13px;cursor:pointer;border:1px solid transparent;text-align:center;transition:.13s;
+  }
+  .fbtn-primary{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(10,110,209,.28)}
+  .fbtn-primary:active{background:#0961bb}
+  .fbtn-ghost{background:none;color:var(--ink-2);border-color:var(--hair-2)}
+  .fbtn-approved{background:var(--pos-soft);color:var(--pos);border:1px solid #b5dec5}
+  .ff-gate{
+    display:flex;align-items:center;gap:8px;font-size:11px;color:var(--ink-2);
+    background:#fbfbfa;border-radius:9px;padding:9px 11px;line-height:1.4;
+  }
+  .ff-gate .g-ic{
+    width:18px;height:18px;border-radius:6px;flex-shrink:0;display:grid;place-items:center;
+    font-size:11px;font-weight:800;color:#fff;
+  }
+  .ff-gate.gate .g-ic{background:var(--crit)}
+  .ff-gate.auto .g-ic{background:var(--pos)}
+
+  .frow{
+    margin:0 15px 8px;background:var(--surface);border-radius:13px;box-shadow:var(--shadow-sm);
+    padding:12px 14px;display:flex;align-items:center;gap:11px;
+  }
+  .frow .frow-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+  .frow .frow-dot.warn{background:var(--crit)} .frow .frow-dot.watch{background:var(--neu)}
+  .frow .frow-body{flex:1;min-width:0}
+  .frow .frow-title{font-size:12.5px;font-weight:600;line-height:1.35}
+  .frow .frow-meta{font-size:10.5px;color:var(--ink-3);margin-top:2px}
+  .frow .frow-cd{font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink-2)}
+
+  .ptabs{display:flex;background:var(--surface);border-top:1px solid var(--hair-2)}
+  .ptabs div{flex:1;text-align:center;padding:9px 0 11px;font-size:9px;font-weight:600;color:var(--ink-3)}
+  .ptabs div.on{color:var(--blue)}
+  .ptabs div .ti{margin:0 auto 4px}
+
+  .notif-col{flex-shrink:0;width:310px;padding-top:8px}
+  .notif-col .nc-h{
+    font-size:12px;font-weight:700;color:var(--ink-2);text-transform:uppercase;
+    letter-spacing:.06em;margin-bottom:14px;
+  }
+  .nli{
+    background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:14px 15px;
+    margin-bottom:12px;border-left:4px solid var(--blue);animation:slidein .5s ease;
+  }
+  @keyframes slidein{from{opacity:0;transform:translateX(16px)}to{opacity:1}}
+  .nli-top{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+  .nli-av{width:25px;height:25px;border-radius:8px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;flex-shrink:0}
+  .nli-src{font-size:11px;font-weight:700;color:var(--ink-2)}
+  .nli-time{margin-left:auto;font-size:10px;color:var(--ink-3)}
+  .nli h4{font-size:13px;font-weight:700;line-height:1.35;margin-bottom:5px}
+  .nli p{font-size:11.5px;color:var(--ink-2);line-height:1.5}
+  .nli-actions{display:flex;gap:8px;margin-top:11px}
+  .nli-actions .btn{font-size:11.5px;padding:7px 13px}
+  .nli-actions .btn-mini-primary{background:var(--blue);color:#fff}
+  .nli-actions .btn-mini-ghost{background:none;color:var(--ink-2);border-color:var(--hair-2)}
+  .nc-note{font-size:11.5px;color:var(--ink-2);line-height:1.65;margin-top:4px}
+  .nc-note b{color:var(--blue)}
+
+  @media(max-width:880px){
+    .layout{grid-template-columns:1fr}
+    .hero-top{flex-direction:column;gap:18px}
+    .countdown{text-align:left}
+    .canvas{padding:24px 16px 60px}
+    .hero,.section,.actionbar{padding-left:22px;padding-right:22px}
+  }
+</style>
+</head>
+<body>
+
+<!-- shell -->
+<div class="shell">
+  <div class="logo">SAP</div>
+  <div class="shell-title">Warehouse Control Tower&nbsp; <span>· Distribution &amp; Logistics</span></div>
+  <div class="shell-right">
+    <div class="env" id="live-badge"><span class="pulse"></span>Live · S/4HANA</div>
+    <div class="switch">
+      <button class="sel" data-v="control" onclick="switchView('control',this)">
+        <svg width="13" height="13" viewBox="0 0 13 13"><rect x="0.6" y="0.6" width="5.2" height="5.2" rx="1" fill="currentColor"/><rect x="7.2" y="0.6" width="5.2" height="5.2" rx="1" fill="currentColor"/><rect x="0.6" y="7.2" width="5.2" height="5.2" rx="1" fill="currentColor"/><rect x="7.2" y="7.2" width="5.2" height="5.2" rx="1" fill="currentColor"/></svg>
+        Control Room</button>
+      <button data-v="field" onclick="switchView('field',this)">
+        <svg width="10" height="13" viewBox="0 0 10 13"><rect x="0.6" y="0.6" width="8.8" height="11.8" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"/><line x1="3.3" y1="10.3" x2="6.7" y2="10.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Field App</button>
+    </div>
+    <div class="avatar">JM</div>
+  </div>
+</div>
+
+<div class="canvas">
+
+  <!-- ============ CONTROL ROOM ============ -->
+  <div class="view on" id="view-control">
+    <div class="situation">
+      <div>
+        <div class="greeting" id="greeting">DC NORTHGATE · SHIFT B · --:--</div>
+        <h1 id="situation-h1">Loading…</h1>
+      </div>
+      <div class="flowstrip" id="flowstrip"><span class="fs-label">FLOW</span></div>
+    </div>
+
+    <div class="layout">
+      <div>
+        <div class="rail-head">Priorities <span class="rh-n" id="rh-count">–</span></div>
+        <div id="rail"></div>
+      </div>
+      <div id="focus-mount"></div>
+    </div>
+
+    <div class="footnote">
+      <b>Focus mode.</b> The Tower surfaces one decision at a time — diagnosis, the recommended
+      recovery, and a single action. Alternatives stay one tap away.
+    </div>
+  </div>
+
+  <!-- ============ FIELD APP ============ -->
+  <div class="view" id="view-field">
+    <div class="field-wrap">
+      <div class="phone">
+        <div class="pscreen">
+          <div class="pstatus"><span id="f-clock">09:42</span><span>5G&nbsp; ▂▄▆</span></div>
+          <div class="phead">
+            <div class="logo">SAP</div>
+            <div class="ph-t">
+              <h2>Control Tower</h2>
+              <p>DC Northgate · Shift B · J. Martel</p>
+            </div>
+            <div class="avatar" style="width:27px;height:27px;font-size:10px">JM</div>
+          </div>
+          <div class="pscroll">
+            <div class="dc-banner" id="dc-banner">
+              <div class="dc-ring">!</div>
+              <div class="dc-t">
+                <b>DC Elevated</b>
+                <p>One decision needs you now. Three more are being watched.</p>
+              </div>
+            </div>
+            <div class="p-section">Decide now <span class="ps-badge">1 NEW</span></div>
+            <div id="ffocus-mount"></div>
+            <div class="p-section">Being watched</div>
+            <div id="frows"></div>
+          </div>
+          <div class="ptabs">
+            <div class="on">
+              <svg class="ti" width="19" height="19" viewBox="0 0 19 19"><path d="M9.5 2.5 17 15.5H2L9.5 2.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              ALERTS</div>
+            <div>
+              <svg class="ti" width="19" height="19" viewBox="0 0 19 19"><rect x="2.5" y="2.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="10.5" y="2.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="2.5" y="10.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="10.5" y="10.5" width="6" height="6" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+              FLOW</div>
+            <div>
+              <svg class="ti" width="19" height="19" viewBox="0 0 19 19"><rect x="3" y="3" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="6" y1="7.5" x2="13" y2="7.5" stroke="currentColor" stroke-width="1.6"/><line x1="6" y1="11.5" x2="10.5" y2="11.5" stroke="currentColor" stroke-width="1.6"/></svg>
+              HANDOVER</div>
+            <div>
+              <svg class="ti" width="19" height="19" viewBox="0 0 19 19"><circle cx="4" cy="9.5" r="1.7" fill="currentColor"/><circle cx="9.5" cy="9.5" r="1.7" fill="currentColor"/><circle cx="15" cy="9.5" r="1.7" fill="currentColor"/></svg>
+              MORE</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- notification rail beside phone -->
+      <div class="notif-col">
+        <div class="nc-h">How the field app reaches you</div>
+        <div class="nli">
+          <div class="nli-top">
+            <div class="nli-av"><svg width="13" height="13" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="6.5" cy="6.5" r="1.8" fill="currentColor"/></svg></div>
+            <span class="nli-src">Control Tower</span>
+            <span class="nli-time">now</span>
+          </div>
+          <h4>A critical decision needs you</h4>
+          <p>An inbound delay puts 14 deliveries for Northbridge Retail at risk of the 16:00 cutoff. A recovery is ready.</p>
+          <div class="nli-actions">
+            <button class="btn btn-mini-primary">Review &amp; approve</button>
+            <button class="btn btn-mini-ghost">Snooze</button>
+          </div>
+        </div>
+        <div class="nli" style="border-left-color:var(--pos)">
+          <div class="nli-top">
+            <div class="nli-av" style="background:var(--pos-soft);color:var(--pos)"><svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 7l2.6 2.6L10.5 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <span class="nli-src">Control Tower</span>
+            <span class="nli-time">8m ago</span>
+          </div>
+          <h4>Recovery on track</h4>
+          <p>The Zone B reallocation is dispatched and pick rate is recovering. No action needed.</p>
+        </div>
+        <div class="nc-note">
+          The app isn't watched — it <b>taps the supervisor on the shoulder</b>. It pushes only
+          material, actionable threats; routine variation stays silent. Complex trade-offs route
+          to "Open on desk" rather than crowding a phone with a full decision.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ─── State ──────────────────────────────────────────────────────────────── */
+let threats    = [];        // populated from API
+let flow       = [];
+let selected   = null;
+let altPick    = {};        // threatId → chosen alternative index (1-based)
+
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
+function fmt(s) {
+  if (s <= 0) return '00 : 00';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+  return String(m).padStart(2, '0') + ' : ' + String(sec).padStart(2, '0');
+}
+
+function now() {
+  const d = new Date();
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+function sevLabel(t) {
+  return t.dispatched ? 'Recovering'
+       : t.severity === 'crit'  ? 'Critical'
+       : t.severity === 'warn'  ? 'At Risk'
+       : 'Watch';
+}
+
+function sevClass(t) {
+  return t.dispatched ? 'done' : t.severity;
+}
+
+/* ─── API helpers ────────────────────────────────────────────────────────── */
+async function api(path, opts = {}) {
+  const r = await fetch('/api' + path, opts);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+/* ─── Load initial data ──────────────────────────────────────────────────── */
+async function loadAll() {
+  const [ts, fl] = await Promise.all([api('/threats'), api('/flow')]);
+  threats = ts;
+  flow    = fl;
+  if (!selected && threats.length) selected = threats[0].id;
+  render();
+}
+
+/* ─── Load full detail for selected threat ───────────────────────────────── */
+let detailCache = {};
+async function loadDetail(id) {
+  if (detailCache[id]) return detailCache[id];
+  const d = await api('/threats/' + id);
+  detailCache[id] = d;
+  return d;
+}
+
+/* ─── Situation header ───────────────────────────────────────────────────── */
+function renderHeader() {
+  document.getElementById('greeting').textContent =
+    'DC NORTHGATE · SHIFT B · ' + now();
+
+  const crit = threats.filter(t => !t.dispatched && t.severity === 'crit').length;
+  const warn = threats.filter(t => !t.dispatched && t.severity === 'warn').length;
+  const h1   = document.getElementById('situation-h1');
+  if (crit) {
+    h1.innerHTML = crit + ' critical decision' + (crit > 1 ? 's' : '') +
+      (warn ? ', <b>' + warn + ' to watch</b>' : '');
+  } else if (warn) {
+    h1.innerHTML = 'No critical issues, <b>' + warn + ' to watch</b>';
+  } else {
+    h1.innerHTML = 'All clear — no active threats';
+  }
+
+  const count = threats.filter(t => !t.dispatched).length;
+  document.getElementById('rh-count').textContent = count;
+}
+
+/* ─── Flow strip ─────────────────────────────────────────────────────────── */
+function renderFlow() {
+  const fsEl = document.getElementById('flowstrip');
+  fsEl.innerHTML = '<span class="fs-label">FLOW</span>';
+  flow.forEach(f => {
+    const s = document.createElement('div');
+    s.className = 'seg ' + (f.status === 'bad' ? 'bad' : f.status === 'warn' ? 'warn' : '');
+    s.innerHTML = `<span class="seg-tip">${f.segment}</span>`;
+    fsEl.appendChild(s);
+  });
+}
+
+/* ─── Rail ───────────────────────────────────────────────────────────────── */
+function renderRail() {
+  const railEl = document.getElementById('rail');
+  railEl.innerHTML = '';
+  threats.forEach((t, i) => {
+    const sev = sevClass(t);
+    const d   = document.createElement('div');
+    d.className = 'qitem' + (selected === t.id ? ' active' : '');
+    d.style.animationDelay = (i * 0.07) + 's';
+    d.onclick = () => { selected = t.id; renderFocus(); renderRail(); };
+    d.innerHTML = `
+      <div class="qi-top">
+        <span class="dot ${sev}"></span>
+        <span class="qi-sev ${sev}">${sevLabel(t)}</span>
+        <span class="qi-cd" data-cd="${t.id}">${fmt(t.secondsToDeadline)}</span>
+      </div>
+      <div class="qi-title">${t.title}</div>
+      <div class="qi-meta">${t.exposure}</div>`;
+    railEl.appendChild(d);
+  });
+}
+
+/* ─── Focus card ─────────────────────────────────────────────────────────── */
+async function renderFocus() {
+  const mount = document.getElementById('focus-mount');
+  mount.innerHTML = '<div style="height:280px;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:13px">Loading…</div>';
+
+  const t   = await loadDetail(selected);
+  const sev = sevClass(t);
+  const pick = altPick[t.id] || 0;
+
+  const path = t.causalPath.map(n => `
+    <div class="pnode ${n.role}">
+      <div class="pn-line"></div>
+      <div class="pn-dot"></div>
+      <div class="pn-label">${n.label}</div>
+      <div class="pn-state">${n.state}</div>
+    </div>`).join('');
+
+  const stats = t.recommendation.stats.map(s => `
+    <div class="rstat">
+      <div class="rs-k">${s.label}</div>
+      <div class="rs-v ${s.sentiment}">${s.value}</div>
+    </div>`).join('');
+
+  const alts = t.alternatives.map((a, idx) => `
+    <div class="alt ${idx === pick - 1 ? 'picked' : ''}"
+         onclick="chooseAlt('${t.id}',${idx + 1})">
+      <div class="alt-top"><div class="radio"></div><div class="alt-name">${a.name}</div></div>
+      <div class="alt-mini">${a.stats.map(m => `<span><b>${m.label}:</b> ${m.value}</span>`).join('')}</div>
+    </div>`).join('');
+
+  mount.innerHTML = `
+   <div class="focus ${sev}">
+    <div class="hero">
+      <div class="hero-top">
+        <div>
+          <span class="pill ${sev}"><span class="pdot"></span>${t.dispatched ? 'RECOVERING' : sevLabel(t).toUpperCase()}</span>
+          <h2>${t.title}</h2>
+          <div class="exposure">${t.exposure}</div>
+        </div>
+        <div class="countdown">
+          <div class="cd-val" data-cd="${t.id}">${fmt(t.secondsToDeadline)}</div>
+          <div class="cd-label">${t.dispatched ? 'buffer regained' : t.deadlineLabel}</div>
+          <div class="cd-conf">Confidence ${t.confidence}%<span class="cbar"><i style="width:${t.confidence}%"></i></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-label">What's happening</div>
+      <div class="path">${path}</div>
+      <div class="path-foot">
+        <svg width="13" height="13" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.4" fill="none" stroke="#94a1b0" stroke-width="1.3"/><line x1="6.5" y1="3.4" x2="6.5" y2="7" stroke="#94a1b0" stroke-width="1.4" stroke-linecap="round"/><circle cx="6.5" cy="9.2" r="0.8" fill="#94a1b0"/></svg>
+        Traced live across linked SAP records — order, inbound, stock, tasks and deliveries.
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-label">Recommended recovery</div>
+      <div class="reco">
+        <div class="reco-tag">
+          <svg width="13" height="13" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.3 6.7l1.7 1.7 3-3.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Agent recommends
+        </div>
+        <h3>${t.recommendation.name}</h3>
+        <div class="reco-desc">${t.recommendation.description}</div>
+        <div class="reco-stats">${stats}</div>
+        <button class="alt-toggle" onclick="toggleAlts(this)">
+          See ${t.alternatives.length} alternative${t.alternatives.length > 1 ? 's' : ''}
+          <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="alts">${alts}</div>
+      </div>
+    </div>
+
+    <div class="actionbar" ${t.dispatched ? 'style="display:none"' : ''}>
+      <div class="autonomy ${t.requiresApproval ? 'gate' : 'auto'}">
+        <div class="a-ic">${t.requiresApproval ? '!' : '✓'}</div>
+        <div class="a-txt"><b>${t.requiresApproval ? 'Needs your approval.' : 'Agent can act.'}</b>
+          ${t.gateText.replace(/^Needs your approval\.|^Agent can act\./, '').trim()}</div>
+      </div>
+      <button class="btn btn-ghost" onclick="doSnooze('${t.id}')">Snooze</button>
+      <button class="btn btn-primary" onclick="doDispatch('${t.id}')">
+        ${t.requiresApproval ? 'Approve & dispatch' : 'Confirm dispatch'}
+      </button>
+    </div>
+
+    <div class="done-state ${t.dispatched ? 'show' : ''}">
+      <div class="check">
+        <svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7" fill="none" stroke="#1a7a3e" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Recovery dispatched</h3>
+      <p>The instruction was routed to the affected area and recorded back in SAP.
+         This threat is now in a recovering state.</p>
+      <div class="verify">
+        <span class="pulse" style="background:#1a7a3e"></span>
+        Verify loop active — tracking resolution
+      </div>
+    </div>
+   </div>`;
+}
+
+/* ─── Field app ──────────────────────────────────────────────────────────── */
+async function renderField() {
+  if (!threats.length) return;
+
+  const t    = await loadDetail(threats[0].id);
+  const sev  = sevClass(t);
+  const mount = document.getElementById('ffocus-mount');
+
+  mount.innerHTML = `
+    <div class="ffocus ${sev}">
+      <div class="ff-hero">
+        <div class="ff-hero-top">
+          <span class="pill ${sev}"><span class="pdot"></span>${t.dispatched ? 'RECOVERING' : sevLabel(t).toUpperCase()}</span>
+          <div class="ff-cd">
+            <div class="v" data-cd="${t.id}">${fmt(t.secondsToDeadline)}</div>
+            <div class="l">${t.dispatched ? 'BUFFER' : 'TO CUTOFF'}</div>
+          </div>
+        </div>
+        <h3>${t.title}</h3>
+        <div class="ff-exp">${t.exposure}</div>
+      </div>
+      <div class="ff-reco">
+        <div class="frl">
+          <svg width="11" height="11" viewBox="0 0 13 13"><circle cx="6.5" cy="6.5" r="5.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.3 6.7l1.7 1.7 3-3.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Agent recommends
+        </div>
+        <h4>${t.recommendation.name}</h4>
+        <div class="frd">${t.recommendation.description}</div>
+        <div class="ff-chips">
+          ${t.recommendation.stats.map(s =>
+            `<span class="fchip">${s.label}: <b style="${s.sentiment ? '' : 'color:var(--ink)'}">${s.value}</b></span>`
+          ).join('')}
+        </div>
+      </div>
+      <div class="ff-actions">
+        <div class="ff-gate ${t.requiresApproval ? 'gate' : 'auto'}">
+          <span class="g-ic">${t.requiresApproval ? '!' : '✓'}</span>
+          <span>${t.gateText}</span>
+        </div>
+        ${t.dispatched
+          ? '<button class="fbtn fbtn-approved">✓ Recovery dispatched</button>'
+          : `<button class="fbtn fbtn-primary" onclick="doDispatch('${t.id}')">${t.requiresApproval ? 'Approve &amp; dispatch' : 'Confirm dispatch'}</button>
+             <button class="fbtn fbtn-ghost">Open full detail on desk</button>`
+        }
+      </div>
+    </div>`;
+
+  const frows = document.getElementById('frows');
+  frows.innerHTML = '';
+  threats.slice(1).forEach(async tw => {
+    const td = await loadDetail(tw.id);
+    const r  = document.createElement('div');
+    r.className = 'frow';
+    r.innerHTML = `
+      <span class="frow-dot ${tw.dispatched ? '' : tw.severity}" ${tw.dispatched ? 'style="background:var(--pos)"' : ''}></span>
+      <div class="frow-body">
+        <div class="frow-title">${tw.title}</div>
+        <div class="frow-meta">${tw.dispatched ? 'Recovering — dispatched' : tw.exposure}</div>
+      </div>
+      <span class="frow-cd" data-cd="${tw.id}">${fmt(tw.secondsToDeadline)}</span>`;
+    frows.appendChild(r);
+  });
+}
+
+/* ─── Actions ────────────────────────────────────────────────────────────── */
+function chooseAlt(id, idx) {
+  altPick[id] = idx;
+  renderFocus();
+  setTimeout(() => {
+    const alts   = document.querySelector('#focus-mount .alts');
+    const toggle = document.querySelector('#focus-mount .alt-toggle');
+    if (alts)   alts.classList.add('show');
+    if (toggle) toggle.classList.add('open');
+  }, 50);
+}
+
+function toggleAlts(btn) {
+  btn.classList.toggle('open');
+  btn.parentNode.querySelector('.alts').classList.toggle('show');
+}
+
+async function doDispatch(id) {
+  const altIndex = (altPick[id] || 1) - 1;   // 0-based; 0 = recommended
+  await api('/threats/' + id + '/dispatch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      alternativeIndex: altPick[id] ? altPick[id] - 1 : null,
+      approvedBy: 'JM',
+    }),
+  });
+  delete detailCache[id];   // invalidate cache
+  threats = await api('/threats');
+  renderAll();
+}
+
+async function doSnooze(id) {
+  await api('/threats/' + id + '/snooze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ minutes: 15 }),
+  });
+}
+
+/* ─── Render all ─────────────────────────────────────────────────────────── */
+function renderAll() {
+  renderHeader();
+  renderFlow();
+  renderRail();
+  renderFocus();
+  renderField();
+}
+
+function render() { renderAll(); }
+
+/* ─── Countdown tick ─────────────────────────────────────────────────────── */
+setInterval(() => {
+  threats.forEach(t => {
+    if (t.secondsToDeadline > 0) t.secondsToDeadline--;
+    document.querySelectorAll('[data-cd="' + t.id + '"]')
+      .forEach(e => e.textContent = fmt(t.secondsToDeadline));
+  });
+  document.getElementById('greeting').textContent =
+    'DC NORTHGATE · SHIFT B · ' + now();
+  const fc = document.getElementById('f-clock');
+  if (fc) fc.textContent = now();
+}, 1000);
+
+/* ─── View switch ────────────────────────────────────────────────────────── */
+function switchView(v, btn) {
+  document.querySelectorAll('.switch button').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  document.querySelectorAll('.view').forEach(x => x.classList.remove('on'));
+  document.getElementById('view-' + v).classList.add('on');
+}
+
+/* ─── Init ───────────────────────────────────────────────────────────────── */
+loadAll().catch(err => {
+  console.error('Failed to load data:', err);
+  document.getElementById('situation-h1').textContent = 'Unable to connect to server';
+});
+</script>
+</body>
+</html>

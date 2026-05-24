@@ -1,0 +1,62 @@
+_schema-version: '3.1'
+ID: warehouse-control-tower
+description: DC-wide orchestration agent — senses disruptions, propagates impact, guides recovery via SAP S/4HANA APIs
+version: 0.1.0
+
+modules:
+
+  # ── Backend service ────────────────────────────────────────────────────────
+  - name: control-tower-srv
+    type: nodejs
+    path: .
+    parameters:
+      buildpack: nodejs_buildpack
+      memory: 256M
+      disk-quota: 512M
+    build-parameters:
+      builder: npm
+      build-result: .
+      ignore:
+        - node_modules/
+        - .env
+    properties:
+      NODE_ENV: production
+    requires:
+      - name: control-tower-destination
+      - name: control-tower-xsuaa
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+
+  # ── Approuter (handles auth + routes traffic to backend + UI) ────────────
+  - name: control-tower-approuter
+    type: approuter.nodejs
+    path: app
+    parameters:
+      memory: 128M
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api
+          url: ~{srv-url}
+          forwardAuthToken: true
+      - name: control-tower-xsuaa
+
+resources:
+
+  # ── SAP Destination service (connects to S/4HANA OData APIs) ─────────────
+  - name: control-tower-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite
+
+  # ── XSUAA (authentication) ────────────────────────────────────────────────
+  - name: control-tower-xsuaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      path: ./xs-security.json

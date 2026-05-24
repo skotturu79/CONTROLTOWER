@@ -1,0 +1,35 @@
+{
+  "name": "warehouse-control-tower",
+  "version": "0.1.0",
+  "description": "DC-wide orchestration agent: senses disruptions, propagates impact, guides recovery via SAP S/4HANA APIs",
+  "main": "srv/server.js",
+  "scripts": {
+    "start": "node srv/server.js",
+    "dev": "nodemon srv/server.js",
+    "cds:watch": "cds watch",
+    "cds:deploy": "cds deploy"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-async-errors": "^3.1.1",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "@sap/cds-dk": "^7.5.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "sqlite",
+        "credentials": {
+          "database": ":memory:"
+        }
+      }
+    }
+  }
+}

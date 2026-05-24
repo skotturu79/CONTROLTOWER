@@ -1,0 +1,27 @@
+{
+  "xsappname": "warehouse-control-tower",
+  "tenant-mode": "dedicated",
+  "description": "Warehouse Control Tower — DC-wide orchestration agent",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.supervisor",
+      "description": "View threats and approve recovery actions"
+    },
+    {
+      "name": "$XSAPPNAME.viewer",
+      "description": "View-only access to the control tower"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "Supervisor",
+      "description": "DC supervisor — can view and approve",
+      "scope-references": ["$XSAPPNAME.supervisor"]
+    },
+    {
+      "name": "Viewer",
+      "description": "Read-only view",
+      "scope-references": ["$XSAPPNAME.viewer"]
+    }
+  ]
+}
